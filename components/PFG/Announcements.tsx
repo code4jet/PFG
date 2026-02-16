@@ -73,8 +73,8 @@ export default function AnnouncementsPage() {
         .upload(fileName, file)
 
       if (uploadError) {
-        console.error(uploadError)
-        alert("File upload failed")
+        console.error("Upload Error:", uploadError)
+        alert(`File upload failed: ${uploadError.message}`)
         setIsSubmitting(false)
         return
       }
