@@ -100,8 +100,8 @@ export default function AnnouncementsPage() {
       setIsModalOpen(false)
       mutate("supabase-announcements")
     } else {
-      console.error(error)
-      alert("Error posting announcement")
+      console.error("Database Error:", error)
+      alert(`Error posting announcement: ${error.message}`)
     }
 
     setIsSubmitting(false)
