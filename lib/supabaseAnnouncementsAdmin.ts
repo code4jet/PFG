@@ -8,7 +8,9 @@ let supabaseAnnouncementsAdminClient: any = null;
  */
 function getSupabaseAnnouncementsAdmin() {
   if (!supabaseAnnouncementsAdminClient) {
-    const supabaseUrl = process.env.SUPABASE_ANNOUNCEMENTS_URL;
+    // Use NEXT_PUBLIC_APP_SUPABASE_URL for URL (same project as announcements)
+    // Fallback to SUPABASE_ANNOUNCEMENTS_URL for backward compatibility
+    const supabaseUrl = process.env.NEXT_PUBLIC_APP_SUPABASE_URL || process.env.SUPABASE_ANNOUNCEMENTS_URL;
     const serviceRoleKey = process.env.SUPABASE_ANNOUNCEMENTS_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !serviceRoleKey) {
