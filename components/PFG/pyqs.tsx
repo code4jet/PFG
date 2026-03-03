@@ -2,7 +2,6 @@
 
 import useSWR from "swr"
 import { useMemo, useState, ChangeEvent, FormEvent } from "react"
-import { getSupabaseClient } from "@/lib/supabase"
 
 /* -------------------------------------------------------------------------- */
 /* TYPES                                                                      */
@@ -47,32 +46,8 @@ async function downloadPDF(url: string, filename: string) {
 
 // 2. Data Fetcher (STRICTLY APPROVED ONLY)
 const fetcher = async (): Promise<PYQ[]> => {
-  const supabase = getSupabaseClient()
-  if (!supabase) return []
-
-  const { data, error } = await supabase
-    .from("pdfs")
-    .select("*")
-    .eq("status", "approved") // <--- CRITICAL: Only show approved files
-    .eq("doc_type", "PYQ")    // <--- CRITICAL: Only show PYQs
-    .order("created_at", { ascending: false })
-
-  if (error) {
-    console.error("Supabase error:", error)
-    return []
-  }
-
-  const baseUrl = process.env.Supabase_URL!
-
-  return (data || []).map((d) => ({
-    id: d.id,
-    name: d.title,
-    subject: d.subject,
-    year: d.semester, // DB uses 'semester', UI uses 'year'
-    type: d.doc_type,
-    link: `${baseUrl}/storage/v1/object/public/pdfs/${d.file_path}`,
-    created_at: d.created_at
-  }))
+  // Data fetching will be reconnected to a new backend later.
+  return []
 }
 
 /* -------------------------------------------------------------------------- */
@@ -80,7 +55,7 @@ const fetcher = async (): Promise<PYQ[]> => {
 /* -------------------------------------------------------------------------- */
 
 export function PYQsPage() {
-  const { data, isLoading } = useSWR<PYQ[]>("pyqs-supabase", fetcher)
+  const { data, isLoading } = useSWR<PYQ[]>("pyqs-data", fetcher)
 
   // -- UI States --
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -137,48 +112,17 @@ export function PYQsPage() {
     e.preventDefault()
     if (!formFile) return alert("Please upload a PDF.")
 
-    const supabase = getSupabaseClient()
-    if (!supabase) return
+    setIsSubmitting(true)
 
-    try {
-      setIsSubmitting(true)
-      
-      // 1. Upload File
-      const fileName = `${Date.now()}-${formFile.name}`
-      const { data: uploadData, error: storageError } = await supabase.storage
-        .from("pdfs")
-        .upload(fileName, formFile)
+    // Backend is not wired right now; just simulate success.
+    alert("PYQs backend is not connected yet. This would be wired to the new database later.")
 
-      if (storageError) throw storageError
-
-      // 2. Insert Record with STATUS: PENDING
-      const { error: dbError } = await supabase.from("pdfs").insert({
-        title: formTitle,
-        subject: formSubject,
-        semester: formYear, // Using 'semester' column for Year
-        doc_type: "PYQ",    // Hardcoded to PYQ
-        file_path: uploadData.path,
-        status: "pending",  // <--- CRITICAL: Will not show in list immediately
-      })
-
-      if (dbError) throw dbError
-
-      // 3. Reset & Close (No mutate needed as list won't change)
-      setIsModalOpen(false)
-      setFormTitle("")
-      setFormSubject("")
-      setFormYear("")
-      setFormFile(null)
-      
-      // 4. Feedback
-      alert("Submission successful! Your PYQ is pending admin approval.")
-
-    } catch (err: any) {
-      console.error(err)
-      alert(err.message || "Upload failed")
-    } finally {
-      setIsSubmitting(false)
-    }
+    setIsModalOpen(false)
+    setFormTitle("")
+    setFormSubject("")
+    setFormYear("")
+    setFormFile(null)
+    setIsSubmitting(false)
   }
 
   return (

@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import useSWR, { mutate } from "swr"
-import { getAnnouncementsSupabaseClient } from "@/lib/supabaseAnnouncements"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -18,19 +17,12 @@ type Announcement = {
 }
 
 const fetcher = async (): Promise<Announcement[]> => {
-  const supabase = getAnnouncementsSupabaseClient()
-  if (!supabase) return []
-
-  const { data } = await supabase
-    .from("announcements")
-    .select("*")
-    .order("created_at", { ascending: false })
-
-  return data || []
+  // Data fetching will be reconnected to a new backend later.
+  return []
 }
 
 export default function AnnouncementsPage() {
-  const { data: announcements } = useSWR("supabase-announcements", fetcher)
+  const { data: announcements } = useSWR("announcements-data", fetcher)
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -46,83 +38,13 @@ export default function AnnouncementsPage() {
     e.preventDefault()
     setIsSubmitting(true)
 
-    const supabase = getAnnouncementsSupabaseClient()
-    if (!supabase) {
-      alert("Supabase client not initialized. Please check your environment variables.")
-      setIsSubmitting(false)
-      return
-    }
+    // Backend is not wired right now; just simulate success.
+    alert("Announcements backend is not connected yet. This would be wired to the new database later.")
 
-    let file_url: string | null = null
-
-    if (file) {
-      const allowedTypes = [
-        "application/pdf",
-        "image/jpeg",
-        "image/jpg",
-        "image/png",
-        "image/webp",
-        "image/gif",
-      ]
-
-      if (!allowedTypes.includes(file.type)) {
-        alert("Only PDF and image files are allowed")
-        setIsSubmitting(false)
-        return
-      }
-
-      const fileName = `${Date.now()}-${file.name}`
-
-      const { error: uploadError } = await supabase.storage
-        .from("announcements-images")
-        .upload(fileName, file)
-
-      if (uploadError) {
-        console.error("Upload Error:", uploadError)
-        
-        // Check if it's a bucket not found error
-        if (uploadError.message?.includes("Bucket not found") || uploadError.message?.includes("bucket not found")) {
-          alert(
-            "Bucket 'announcements-images' not found in your Supabase Announcements project.\n\n" +
-            "Please create it:\n" +
-            "1. Go to your Supabase Dashboard\n" +
-            "2. Navigate to Storage\n" +
-            "3. Create a new bucket named 'announcements-images'\n" +
-            "4. Make it Public\n" +
-            "5. Set proper policies for uploads"
-          )
-        } else {
-          alert(`File upload failed: ${uploadError.message}`)
-        }
-        setIsSubmitting(false)
-        return
-      }
-
-      const { data } = supabase.storage
-        .from("announcements-images")
-        .getPublicUrl(fileName)
-
-      file_url = data.publicUrl
-    }
-
-    const { error } = await supabase.from("announcements").insert([
-      {
-        title: formData.title,
-        description: formData.description,
-        file_url,
-      },
-    ])
-
-    if (!error) {
       setFormData({ title: "", description: "" })
       setFile(null)
       setIsModalOpen(false)
-      mutate("supabase-announcements")
-    } else {
-      console.error("Database Error:", error)
-      alert(`Error posting announcement: ${error.message}`)
-    }
-
+      mutate("announcements-data")
     setIsSubmitting(false)
   }
 

@@ -2,7 +2,6 @@
 
 import useSWR, { mutate } from "swr"
 import { useMemo, useState, ChangeEvent, FormEvent } from "react"
-import { getSupabaseClient } from "@/lib/supabase"
 
 /* -------------------------------------------------------------------------- */
 /* TYPES                                                                      */
@@ -46,31 +45,8 @@ async function downloadPDF(url: string, filename: string) {
 
 // 2. Data Fetcher (ONLY SHOWS APPROVED)
 const fetcher = async (): Promise<Assignment[]> => {
-  const supabase = getSupabaseClient()
-  if (!supabase) return []
-
-  const { data, error } = await supabase
-    .from("pdfs")
-    .select("*")
-    .eq("status", "approved") // <--- STRICT FILTER
-    .eq("doc_type", "Assignment")
-    .order("created_at", { ascending: false })
-
-  if (error) {
-    console.error("Supabase error:", error)
-    return []
-  }
-
-  const baseUrl = process.env.Supabase_URL!
-
-  return (data || []).map((d) => ({
-    id: d.id,
-    name: d.title,
-    subject: d.subject,
-    semester: d.semester,
-    link: `${baseUrl}/storage/v1/object/public/pdfs/${d.file_path}`,
-    created_at: d.created_at
-  }))
+  // Data fetching will be reconnected to a new backend later.
+  return []
 }
 
 /* -------------------------------------------------------------------------- */
@@ -78,7 +54,7 @@ const fetcher = async (): Promise<Assignment[]> => {
 /* -------------------------------------------------------------------------- */
 
 export function AssignmentsPage() {
-  const { data, isLoading } = useSWR<Assignment[]>("assignments-supabase", fetcher)
+  const { data, isLoading } = useSWR<Assignment[]>("assignments-data", fetcher)
 
   // -- UI States --
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -135,48 +111,17 @@ export function AssignmentsPage() {
     e.preventDefault()
     if (!formFile) return alert("Please upload a PDF.")
 
-    const supabase = getSupabaseClient()
-    if (!supabase) return
+    setIsSubmitting(true)
 
-    try {
-      setIsSubmitting(true)
-      
-      // 1. Upload File
-      const fileName = `${Date.now()}-${formFile.name}`
-      const { data: uploadData, error: storageError } = await supabase.storage
-        .from("pdfs")
-        .upload(fileName, formFile)
+    // Backend is not wired right now; just simulate success.
+    alert("Assignments backend is not connected yet. This would be wired to the new database later.")
 
-      if (storageError) throw storageError
-
-      // 2. Insert Record with STATUS: PENDING
-      const { error: dbError } = await supabase.from("pdfs").insert({
-        title: formTitle,
-        subject: formSubject,
-        semester: formYear,
-        doc_type: "Assignment",
-        file_path: uploadData.path,
-        status: "pending", // <--- CRITICAL FIX: Ensures it doesn't show up immediately
-      })
-
-      if (dbError) throw dbError
-
-      // 3. Reset & Close
-      setIsModalOpen(false)
-      setFormTitle("")
-      setFormSubject("")
-      setFormYear("")
-      setFormFile(null)
-      
-      // 4. Feedback (No mutate needed as it won't show up anyway)
-      alert("Submission successful! Your assignment is pending admin approval.")
-
-    } catch (err: any) {
-      console.error(err)
-      alert(err.message || "Upload failed")
-    } finally {
-      setIsSubmitting(false)
-    }
+    setIsModalOpen(false)
+    setFormTitle("")
+    setFormSubject("")
+    setFormYear("")
+    setFormFile(null)
+    setIsSubmitting(false)
   }
 
   return (

@@ -13,27 +13,12 @@ import {
   Check,
   X,
 } from "lucide-react";
-import { getSupabaseClient } from "@/lib/supabase";
-const SUPABASE_URL = process.env.Supabase_URL!;
 
-/* ---------------- SUPABASE HELPERS ---------------- */
+/* ---------------- DATA HELPERS (STUBBED) ---------------- */
 
 const fetchPending = async () => {
-  const supabase = getSupabaseClient();
-  if (!supabase) return [];
-
-  const { data, error } = await supabase
-    .from("pdfs")
-    .select("*")
-    .eq("status", "pending")
-    .order("created_at", { ascending: true });
-
-  if (error) {
-    console.error(error);
-    return [];
-  }
-
-  return data || [];
+  // Backend will be re-wired later (Supabase removed).
+  return [];
 };
 
 
@@ -124,7 +109,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
 
                 {/*View PDF */}
                 <a
-                  href={`${SUPABASE_URL}/storage/v1/object/public/pdfs/${d.file_path}`}
+                  href="#"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-block mt-1 text-sm text-indigo-600 hover:text-indigo-800 underline font-medium transition-colors"

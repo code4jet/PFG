@@ -5,7 +5,6 @@ import React, {
   FormEvent,
   useEffect,
 } from "react";
-import { getSupabaseClient } from "@/lib/supabase";
 
 /* Icons (black) */
 const UploadIcon = () => (
@@ -24,27 +23,12 @@ const FileIcon = () => (
 
 export default function SubmitForm() {
   /* ✅ ALL HOOKS FIRST (NO RETURNS ABOVE THIS) */
-  const [mounted, setMounted] = useState(false);
-  const [supabase, setSupabase] = useState<any>(null);
-
   const [title, setTitle] = useState("");
   const [subject, setSubject] = useState("");
   const [year, setYear] = useState("");
   const [type, setType] = useState("PYQ");
   const [file, setFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  /* ✅ Client-only init */
-  useEffect(() => {
-    setMounted(true);
-    const client = getSupabaseClient();
-    setSupabase(client);
-  }, []);
-
-  /* ✅ SAFE CONDITIONAL RENDER (AFTER HOOKS) */
-  if (!mounted || !supabase) {
-    return null;
-  }
 
   const handleFile = (e: ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
@@ -67,41 +51,17 @@ export default function SubmitForm() {
     e.preventDefault();
     if (!file) return alert("Please upload a PDF.");
 
-    try {
-      setIsSubmitting(true);
+    setIsSubmitting(true);
 
-      const fileName = `${Date.now()}-${file.name}`;
-      const { data, error: storageError } = await supabase.storage
-        .from("pdfs")
-        .upload(fileName, file);
+    // Backend is not wired right now; just simulate success.
+    alert("Submission backend is not connected yet. This would be wired to the new database later.");
 
-      if (storageError) throw storageError;
-
-      const { error: dbError } = await supabase.from("pdfs").insert({
-        title,
-        subject,
-        semester: year,
-        doc_type: type,
-        file_path: data.path,
-        status: "pending",
-      });
-
-      if (dbError) throw dbError;
-
-      alert("Submitted! Awaiting admin approval.");
-
-      setTitle("");
-      setSubject("");
-      setYear("");
-      setType("PYQ");
-      setFile(null);
-    } catch (err: any) {
-  console.error("FULL ERROR:", err);
-  alert(err?.message || "Upload failed");
-}
- {
-      setIsSubmitting(false);
-    }
+    setTitle("");
+    setSubject("");
+    setYear("");
+    setType("PYQ");
+    setFile(null);
+    setIsSubmitting(false);
   };
 
   return (
