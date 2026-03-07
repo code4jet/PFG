@@ -1,6 +1,8 @@
 
 
-export const metadata = {
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
   title: "Programming for Genz | Coding, Courses & PYQs for Students",
   description:
     "Join Programming for Genz — a student-driven coding community with assignments, PYQs, courses, and opportunities to grow in tech.",
