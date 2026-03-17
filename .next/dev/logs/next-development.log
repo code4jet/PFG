@@ -1,0 +1,6 @@
+[00:02:25.033] Server  ERROR   Error: ENOENT: no such file or directory, scandir 'C:\Users\Dipak\Desktop\PFG\app'
+[00:02:25.040] Server  ERROR    ⨯ "unhandledRejection:" Error: ENOENT: no such file or directory, scandir 'C:\Users\Dipak\Desktop\PFG\app'
+[00:02:25.046] Server  ERROR    ⨯ "unhandledRejection: " Error: ENOENT: no such file or directory, scandir 'C:\Users\Dipak\Desktop\PFG\app'
+[00:02:25.410] Server  ERROR   Error: ENOENT: no such file or directory, scandir 'C:\Users\Dipak\Desktop\PFG\app'
+[00:02:25.412] Server  ERROR    ⨯ "unhandledRejection:" Error: ENOENT: no such file or directory, scandir 'C:\Users\Dipak\Desktop\PFG\app'
+[00:02:25.416] Server  ERROR    ⨯ "unhandledRejection: " Error: ENOENT: no such file or directory, scandir 'C:\Users\Dipak\Desktop\PFG\app'
