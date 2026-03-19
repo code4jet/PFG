@@ -2,8 +2,9 @@
 
 import { getAnnouncementsSupabaseClient } from "./supabaseAnnouncements";
 
+// Announcements storage base URL, using the same env var as the Announcements client
 const BASE_URL =
-  `${process.env.NEXT_PUBLIC_SUPABASE_ANNOUNCEMENTS_URL}/storage/v1/object/public/announcements-images/`;
+  `${process.env.NEXT_PUBLIC_APP_SUPABASE_URL}/storage/v1/object/public/announcements-images/`;
 
 export async function getCourseAnnouncements() {
   const supabase = getAnnouncementsSupabaseClient();
