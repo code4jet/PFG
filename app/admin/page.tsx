@@ -14,7 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { getSupabaseClient } from "@/lib/supabase";
-const SUPABASE_URL = process.env.Supabase_URL!;
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 
 /* ---------------- SUPABASE HELPERS ---------------- */
 
@@ -40,19 +40,31 @@ const fetchPending = async () => {
 
 
 async function approvePdf(id: string) {
-  await fetch("/api/admin/pdf/approve", {
+  const res = await fetch("/api/admin/pdf/approve", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id }),
   });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error("Approve failed:", res.status, body);
+    throw new Error(body.error || "Failed to approve PDF");
+  }
 }
 
 async function rejectPdf(id: string, filePath: string) {
-  await fetch("/api/admin/pdf/reject", {
+  const res = await fetch("/api/admin/pdf/reject", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id, filePath }),
   });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error("Reject failed:", res.status, body);
+    throw new Error(body.error || "Failed to reject PDF");
+  }
 }
 
 /* ---------------- ADMIN DASHBOARD ---------------- */
@@ -165,7 +177,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
 
 /* ---------------- LOGIN PAGE ---------------- */
 
-const ADMIN_PASS = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "admin";
+const ADMIN_PASS = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "admin123";
 
 export default function AdminPage() {
   const [input, setInput] = useState("");
