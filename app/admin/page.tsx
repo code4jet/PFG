@@ -4,7 +4,6 @@ import React, { useState } from "react";
 import useSWR from "swr";
 import {
   Lock,
-  User,
   LayoutDashboard,
   Settings,
   LogOut,
@@ -14,9 +13,17 @@ import {
   X,
 } from "lucide-react";
 import { getSupabaseClient } from "@/lib/supabase";
+
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 
 /* ---------------- SUPABASE HELPERS ---------------- */
+type AnnouncementAdmin = {
+  id: string;
+  title: string;
+  description: string;
+  is_active?: boolean;
+  created_at: string;
+};
 
 const fetchPending = async () => {
   const supabase = getSupabaseClient();
@@ -35,9 +42,6 @@ const fetchPending = async () => {
 
   return data || [];
 };
-
-
-
 
 async function approvePdf(id: string) {
   const res = await fetch("/api/admin/pdf/approve", {
@@ -67,14 +71,49 @@ async function rejectPdf(id: string, filePath: string) {
   }
 }
 
+async function fetchAnnouncementsAdmin(): Promise<AnnouncementAdmin[]> {
+  const res = await fetch("/api/admin/announcements");
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || "Failed to load announcements");
+  return body.data || [];
+}
+
+async function setAnnouncementActive(id: string, isActive: boolean) {
+  const res = await fetch("/api/admin/announcements", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, is_active: isActive }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || "Failed to update announcement");
+  }
+}
+
+async function deleteAnnouncement(id: string) {
+  const res = await fetch("/api/admin/announcements", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || "Failed to delete announcement");
+  }
+}
+
 /* ---------------- ADMIN DASHBOARD ---------------- */
 
 function AdminPanel({ onLogout }: { onLogout: () => void }) {
   const { data, mutate } = useSWR("pending-pdfs", fetchPending);
+  const {
+    data: announcements,
+    mutate: mutateAnnouncements,
+    error: announcementsError,
+  } = useSWR("admin-announcements", fetchAnnouncementsAdmin);
 
   return (
     <div className="flex h-screen bg-gray-50 text-black">
-      {/* Sidebar - Hidden on Mobile */}
       <aside className="w-64 bg-white border-r hidden md:flex flex-col shadow-sm">
         <div className="p-6 font-bold text-xl border-b">AdminPanel</div>
 
@@ -103,11 +142,9 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 overflow-y-auto">
-        {/* Header - Added Mobile Logout Button */}
         <header className="sticky top-0 bg-white/80 backdrop-blur-md border-b px-6 py-4 flex justify-between items-center z-10">
-          <h2 className="text-xl md:text-2xl font-bold">Pending Submissions</h2>
+          <h2 className="text-xl md:text-2xl font-bold">Admin Dashboard</h2>
           <button
             onClick={onLogout}
             className="md:hidden flex items-center gap-2 text-red-600 text-sm font-medium px-3 py-2 rounded-lg bg-red-50 active:scale-95 transition-all"
@@ -117,6 +154,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
         </header>
 
         <div className="p-4 md:p-8 space-y-4 max-w-5xl mx-auto">
+          <h3 className="text-lg font-semibold">Pending PDF Submissions</h3>
           {data?.length === 0 && (
             <div className="text-gray-500 text-center py-20 bg-white border border-dashed rounded-xl">
               No pending PDFs 🎉
@@ -134,7 +172,6 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                   {d.subject} • {d.semester} • {d.doc_type}
                 </p>
 
-                {/*View PDF */}
                 <a
                   href={`${SUPABASE_URL}/storage/v1/object/public/pdfs/${d.file_path}`}
                   target="_blank"
@@ -145,12 +182,15 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                 </a>
               </div>
 
-              {/* Action Buttons - Stacked on mobile, side-by-side on desktop */}
               <div className="flex gap-2 w-full sm:w-auto mt-2 sm:mt-0">
                 <button
                   onClick={async () => {
-                    await approvePdf(d.id);
-                    mutate();
+                    try {
+                      await approvePdf(d.id);
+                      await mutate();
+                    } catch (err: any) {
+                      alert(err?.message || "Failed to approve PDF");
+                    }
                   }}
                   className="flex-1 sm:flex-none px-4 py-2.5 rounded-lg bg-green-600 hover:bg-green-700 text-white flex items-center justify-center gap-2 font-medium transition-all active:scale-95"
                 >
@@ -159,12 +199,72 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
 
                 <button
                   onClick={async () => {
-                    await rejectPdf(d.id, d.file_path);
-                    mutate();
+                    try {
+                      await rejectPdf(d.id, d.file_path);
+                      await mutate();
+                    } catch (err: any) {
+                      alert(err?.message || "Failed to reject PDF");
+                    }
                   }}
                   className="flex-1 sm:flex-none px-4 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white flex items-center justify-center gap-2 font-medium transition-all active:scale-95"
                 >
                   <X size={16} /> Reject
+                </button>
+              </div>
+            </div>
+          ))}
+
+          <div className="pt-6 border-t mt-6" />
+          <h3 className="text-lg font-semibold">Announcements</h3>
+          {announcementsError && (
+            <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4">
+              Could not load announcements
+            </div>
+          )}
+          {!announcementsError && announcements?.length === 0 && (
+            <div className="text-gray-500 text-center py-10 bg-white border border-dashed rounded-xl">
+              No announcements found.
+            </div>
+          )}
+          {announcements?.map((a) => (
+            <div
+              key={a.id}
+              className="bg-white border rounded-xl p-5 flex flex-col sm:flex-row justify-between sm:items-center gap-4 transition-all hover:shadow-md"
+            >
+              <div className="space-y-1">
+                <p className="font-semibold text-lg text-black">{a.title}</p>
+                <p className="text-sm text-gray-600">{a.description}</p>
+                <p className="text-xs text-gray-500">
+                  Status: {a.is_active ? "Active" : "Inactive"} •{" "}
+                  {new Date(a.created_at).toLocaleString()}
+                </p>
+              </div>
+              <div className="flex gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+                <button
+                  onClick={async () => {
+                    try {
+                      await setAnnouncementActive(a.id, !a.is_active);
+                      await mutateAnnouncements();
+                    } catch (err: any) {
+                      alert(err?.message || "Failed to update announcement");
+                    }
+                  }}
+                  className="flex-1 sm:flex-none px-4 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center gap-2 font-medium transition-all active:scale-95"
+                >
+                  {a.is_active ? "Deactivate" : "Activate"}
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      await deleteAnnouncement(a.id);
+                      await mutateAnnouncements();
+                    } catch (err: any) {
+                      alert(err?.message || "Failed to delete announcement");
+                    }
+                  }}
+                  className="flex-1 sm:flex-none px-4 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white flex items-center justify-center gap-2 font-medium transition-all active:scale-95"
+                >
+                  Delete
                 </button>
               </div>
             </div>
@@ -223,7 +323,11 @@ export default function AdminPage() {
           className="w-full px-4 py-3 border border-gray-300 rounded-xl text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all mb-3"
         />
 
-        {error && <p className="text-red-500 text-sm mb-3 text-center font-medium animate-pulse">{error}</p>}
+        {error && (
+          <p className="text-red-500 text-sm mb-3 text-center font-medium animate-pulse">
+            {error}
+          </p>
+        )}
 
         <button
           type="submit"
@@ -231,9 +335,7 @@ export default function AdminPage() {
           className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl shadow-md transition-all active:scale-95 disabled:opacity-70 disabled:active:scale-100 flex items-center justify-center"
         >
           {loading ? (
-            <span className="flex items-center gap-2">
-              Checking...
-            </span>
+            <span className="flex items-center gap-2">Checking...</span>
           ) : (
             "Access Dashboard"
           )}
