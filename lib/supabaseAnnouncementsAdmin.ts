@@ -8,13 +8,17 @@ let supabaseAnnouncementsAdminClient: any = null;
  */
 function getSupabaseAnnouncementsAdmin() {
   if (!supabaseAnnouncementsAdminClient) {
-    const supabaseUrl = process.env.SUPABASE_ANNOUNCEMENTS_URL;
-    const serviceRoleKey = process.env.SUPABASE_ANNOUNCEMENTS_SERVICE_ROLE_KEY;
+    const supabaseUrl = process.env.NEXT_PUBLIC_APP_SUPABASE_URL;
+    const serviceRoleKey =
+      process.env.SUPABASE_ANNOUNCEMENTS_SERVICE_ROLE_KEY ||
+      process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !serviceRoleKey) {
       console.error("Missing Supabase Announcements Admin credentials. Please set:");
-      console.error("- SUPABASE_ANNOUNCEMENTS_URL");
-      console.error("- SUPABASE_ANNOUNCEMENTS_SERVICE_ROLE_KEY");
+      console.error("- NEXT_PUBLIC_APP_SUPABASE_URL");
+      console.error(
+        "- SUPABASE_ANNOUNCEMENTS_SERVICE_ROLE_KEY (or SUPABASE_SERVICE_ROLE_KEY)"
+      );
       return null;
     }
 
