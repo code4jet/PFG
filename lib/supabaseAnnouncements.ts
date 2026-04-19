@@ -7,15 +7,14 @@ import { createClient } from "@supabase/supabase-js";
 export function getAnnouncementsSupabaseClient() {
   if (typeof window === "undefined") return null;
 
-  // Uses dedicated Announcements project env vars
-  // Kept in sync with Vercel: NEXT_PUBLIC_APP_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_D_KEY
-  const supabaseUrl = process.env.NEXT_PUBLIC_APP_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_D_KEY;
+  // Uses unified Supabase project env vars
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
     console.error("Missing Supabase Announcements credentials. Please set:");
-    console.error("- NEXT_PUBLIC_APP_SUPABASE_URL");
-    console.error("- NEXT_PUBLIC_SUPABASE_ANON_D_KEY");
+    console.error("- NEXT_PUBLIC_SUPABASE_URL");
+    console.error("- NEXT_PUBLIC_SUPABASE_ANON_KEY");
     return null;
   }
 

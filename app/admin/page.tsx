@@ -21,26 +21,14 @@ type AnnouncementAdmin = {
   id: string;
   title: string;
   description: string;
-  is_active?: boolean;
   created_at: string;
 };
 
 const fetchPending = async () => {
-  const supabase = getSupabaseClient();
-  if (!supabase) return [];
-
-  const { data, error } = await supabase
-    .from("pdfs")
-    .select("*")
-    .eq("status", "pending")
-    .order("created_at", { ascending: true });
-
-  if (error) {
-    console.error(error);
-    return [];
-  }
-
-  return data || [];
+  const res = await fetch("/api/admin/pdfs");
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || "Failed to load pending PDFs");
+  return body.data || [];
 };
 
 async function approvePdf(id: string) {
@@ -72,22 +60,10 @@ async function rejectPdf(id: string, filePath: string) {
 }
 
 async function fetchAnnouncementsAdmin(): Promise<AnnouncementAdmin[]> {
-  const res = await fetch("/api/admin/announcements");
+  const res = await fetch("/api/admin/announcements?approved=true");
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.error || "Failed to load announcements");
   return body.data || [];
-}
-
-async function setAnnouncementActive(id: string, isActive: boolean) {
-  const res = await fetch("/api/admin/announcements", {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id, is_active: isActive }),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.error || "Failed to update announcement");
-  }
 }
 
 async function deleteAnnouncement(id: string) {
@@ -102,15 +78,79 @@ async function deleteAnnouncement(id: string) {
   }
 }
 
+async function clearAllAnnouncements() {
+  const res = await fetch("/api/admin/announcements/clear", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({}),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || "Failed to clear announcements");
+  }
+}
+
+async function approveAnnouncement(id: string) {
+  const res = await fetch("/api/admin/announcements", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, is_active: true }),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error("Approve failed:", res.status, body);
+    throw new Error(body.error || "Failed to approve announcement");
+  }
+}
+
+async function rejectAnnouncement(id: string) {
+  const res = await fetch("/api/admin/announcements", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id }),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error("Reject failed:", res.status, body);
+    throw new Error(body.error || "Failed to reject announcement");
+  }
+}
+
+async function fetchPendingAnnouncements(): Promise<AnnouncementAdmin[]> {
+  const res = await fetch("/api/admin/announcements?pending=true");
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || "Failed to load pending announcements");
+  return body.data || [];
+}
+
 /* ---------------- ADMIN DASHBOARD ---------------- */
 
 function AdminPanel({ onLogout }: { onLogout: () => void }) {
-  const { data, mutate } = useSWR("pending-pdfs", fetchPending);
+  const { data, mutate, error: pendingPdfsError } = useSWR("pending-pdfs", fetchPending);
+  const {
+    data: pendingAnnouncements,
+    mutate: mutatePendingAnnouncements,
+    error: pendingAnnouncementsError,
+  } = useSWR("pending-announcements", fetchPendingAnnouncements);
   const {
     data: announcements,
     mutate: mutateAnnouncements,
     error: announcementsError,
   } = useSWR("admin-announcements", fetchAnnouncementsAdmin);
+
+  // Auto-logout if any of the data fetches return 401
+  React.useEffect(() => {
+    if (
+      pendingPdfsError?.message?.includes("Unauthorized") ||
+      pendingAnnouncementsError?.message?.includes("Unauthorized") ||
+      announcementsError?.message?.includes("Unauthorized")
+    ) {
+      onLogout();
+    }
+  }, [pendingPdfsError, pendingAnnouncementsError, announcementsError, onLogout]);
 
   return (
     <div className="flex h-screen bg-gray-50 text-black">
@@ -161,7 +201,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
             </div>
           )}
 
-          {data?.map((d) => (
+          {data?.map((d: any) => (
             <div
               key={d.id}
               className="bg-white border rounded-xl p-5 flex flex-col sm:flex-row justify-between sm:items-center gap-4 transition-all hover:shadow-md"
@@ -215,7 +255,77 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
           ))}
 
           <div className="pt-6 border-t mt-6" />
-          <h3 className="text-lg font-semibold">Announcements</h3>
+          <h3 className="text-lg font-semibold">Pending Announcements</h3>
+          {pendingAnnouncementsError && (
+            <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4">
+              Could not load pending announcements
+            </div>
+          )}
+          {!pendingAnnouncementsError && pendingAnnouncements?.length === 0 && (
+            <div className="text-gray-500 text-center py-20 bg-white border border-dashed rounded-xl">
+              No pending announcements 🎉
+            </div>
+          )}
+          {pendingAnnouncements?.map((a) => (
+            <div
+              key={a.id}
+              className="bg-white border rounded-xl p-5 flex flex-col sm:flex-row justify-between sm:items-center gap-4 transition-all hover:shadow-md"
+            >
+              <div className="space-y-1">
+                <p className="font-semibold text-lg text-black">{a.title}</p>
+                <p className="text-sm text-gray-600">{a.description}</p>
+                <p className="text-xs text-gray-500">{new Date(a.created_at).toLocaleString()}</p>
+              </div>
+              <div className="flex gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+                <button
+                  onClick={async () => {
+                    try {
+                      await approveAnnouncement(a.id);
+                      await mutatePendingAnnouncements();
+                    } catch (err: any) {
+                      alert(err?.message || "Failed to approve announcement");
+                    }
+                  }}
+                  className="flex-1 sm:flex-none px-4 py-2.5 rounded-lg bg-green-600 hover:bg-green-700 text-white flex items-center justify-center gap-2 font-medium transition-all active:scale-95"
+                >
+                  <Check size={16} /> Approve
+                </button>
+
+                <button
+                  onClick={async () => {
+                    try {
+                      await rejectAnnouncement(a.id);
+                      await mutatePendingAnnouncements();
+                    } catch (err: any) {
+                      alert(err?.message || "Failed to reject announcement");
+                    }
+                  }}
+                  className="flex-1 sm:flex-none px-4 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white flex items-center justify-center gap-2 font-medium transition-all active:scale-95"
+                >
+                  <X size={16} /> Reject
+                </button>
+              </div>
+            </div>
+          ))}
+
+          <div className="pt-6 border-t mt-6" />
+          <div className="flex items-center justify-between gap-4">
+            <h3 className="text-lg font-semibold">Approved Announcements</h3>
+            <button
+              onClick={async () => {
+                if (!confirm("Delete all announcements?")) return;
+                try {
+                  await clearAllAnnouncements();
+                  await mutateAnnouncements();
+                } catch (err: any) {
+                  alert(err?.message || "Failed to clear announcements");
+                }
+              }}
+              className="px-4 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white flex items-center justify-center gap-2 font-medium transition-all active:scale-95 text-sm whitespace-nowrap"
+            >
+              Clear All
+            </button>
+          </div>
           {announcementsError && (
             <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4">
               Could not load announcements
@@ -234,25 +344,9 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
               <div className="space-y-1">
                 <p className="font-semibold text-lg text-black">{a.title}</p>
                 <p className="text-sm text-gray-600">{a.description}</p>
-                <p className="text-xs text-gray-500">
-                  Status: {a.is_active ? "Active" : "Inactive"} •{" "}
-                  {new Date(a.created_at).toLocaleString()}
-                </p>
+                <p className="text-xs text-gray-500">{new Date(a.created_at).toLocaleString()}</p>
               </div>
               <div className="flex gap-2 w-full sm:w-auto mt-2 sm:mt-0">
-                <button
-                  onClick={async () => {
-                    try {
-                      await setAnnouncementActive(a.id, !a.is_active);
-                      await mutateAnnouncements();
-                    } catch (err: any) {
-                      alert(err?.message || "Failed to update announcement");
-                    }
-                  }}
-                  className="flex-1 sm:flex-none px-4 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center gap-2 font-medium transition-all active:scale-95"
-                >
-                  {a.is_active ? "Deactivate" : "Activate"}
-                </button>
                 <button
                   onClick={async () => {
                     try {
@@ -277,30 +371,68 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
 
 /* ---------------- LOGIN PAGE ---------------- */
 
-const ADMIN_PASS = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "admin123";
-
 export default function AdminPage() {
   const [input, setInput] = useState("");
   const [auth, setAuth] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
 
-  const login = (e: React.FormEvent) => {
+  React.useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const res = await fetch("/api/admin/check");
+        if (res.ok) {
+          setAuth(true);
+        }
+      } catch (err) {
+        // Not authenticated
+      } finally {
+        setCheckingAuth(false);
+      }
+    };
+    checkAuth();
+  }, []);
+
+  const login = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
-    setTimeout(() => {
-      if (input.trim() === ADMIN_PASS.trim()) {
+    try {
+      const res = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: input }),
+      });
+
+      if (res.ok) {
         setAuth(true);
       } else {
-        setError("Incorrect password");
+        const body = await res.json().catch(() => ({}));
+        setError(body.error || "Incorrect password");
       }
+    } catch (err) {
+      setError("Login failed. Check connection.");
+    } finally {
       setLoading(false);
-    }, 500);
+    }
   };
 
-  if (auth) return <AdminPanel onLogout={() => setAuth(false)} />;
+  const handleLogout = async () => {
+    await fetch("/api/admin/logout", { method: "POST" });
+    setAuth(false);
+  };
+
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="w-8 h-8 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (auth) return <AdminPanel onLogout={handleLogout} />;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">

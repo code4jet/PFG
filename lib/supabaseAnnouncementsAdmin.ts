@@ -8,17 +8,13 @@ let supabaseAnnouncementsAdminClient: any = null;
  */
 function getSupabaseAnnouncementsAdmin() {
   if (!supabaseAnnouncementsAdminClient) {
-    const supabaseUrl = process.env.NEXT_PUBLIC_APP_SUPABASE_URL;
-    const serviceRoleKey =
-      process.env.SUPABASE_ANNOUNCEMENTS_SERVICE_ROLE_KEY ||
-      process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !serviceRoleKey) {
       console.error("Missing Supabase Announcements Admin credentials. Please set:");
-      console.error("- NEXT_PUBLIC_APP_SUPABASE_URL");
-      console.error(
-        "- SUPABASE_ANNOUNCEMENTS_SERVICE_ROLE_KEY (or SUPABASE_SERVICE_ROLE_KEY)"
-      );
+      console.error("- NEXT_PUBLIC_SUPABASE_URL");
+      console.error("- SUPABASE_SERVICE_ROLE_KEY");
       return null;
     }
 
@@ -31,7 +27,10 @@ function getSupabaseAnnouncementsAdmin() {
 export const supabaseAnnouncementsAdmin: any = new Proxy({}, {
   get: (target, prop) => {
     const client = getSupabaseAnnouncementsAdmin();
-    if (!client) return undefined;
-    return client[prop];
+    const value = client[prop as keyof typeof client];
+    if (typeof value === "function") {
+      return value.bind(client);
+    }
+    return value;
   },
 });

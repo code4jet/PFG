@@ -47,32 +47,26 @@ async function downloadPDF(url: string, filename: string) {
 
 // 2. Data Fetcher (STRICTLY APPROVED ONLY)
 const fetcher = async (): Promise<PYQ[]> => {
-  const supabase = getSupabaseClient()
-  if (!supabase) return []
+  try {
+    const res = await fetch("/api/public/pdfs?doc_type=PYQ")
+    if (!res.ok) throw new Error("Failed to fetch")
+    const { data } = await res.json()
 
-  const { data, error } = await supabase
-    .from("pdfs")
-    .select("*")
-    .eq("status", "approved") // <--- CRITICAL: Only show approved files
-    .eq("doc_type", "PYQ")    // <--- CRITICAL: Only show PYQs
-    .order("created_at", { ascending: false })
+    const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 
-  if (error) {
-    console.error("Supabase error:", error)
+    return (data || []).map((d: any) => ({
+      id: d.id,
+      name: d.title,
+      subject: d.subject,
+      year: d.semester, // DB uses 'semester', UI uses 'year'
+      type: d.doc_type,
+      link: `${baseUrl}/storage/v1/object/public/pdfs/${d.file_path}`,
+      created_at: d.created_at
+    }))
+  } catch (error) {
+    console.error("Fetch error:", error)
     return []
   }
-
-  const baseUrl = process.env.Supabase_URL!
-
-  return (data || []).map((d) => ({
-    id: d.id,
-    name: d.title,
-    subject: d.subject,
-    year: d.semester, // DB uses 'semester', UI uses 'year'
-    type: d.doc_type,
-    link: `${baseUrl}/storage/v1/object/public/pdfs/${d.file_path}`,
-    created_at: d.created_at
-  }))
 }
 
 /* -------------------------------------------------------------------------- */
@@ -151,17 +145,23 @@ export function PYQsPage() {
 
       if (storageError) throw storageError
 
-      // 2. Insert Record with STATUS: PENDING
-      const { error: dbError } = await supabase.from("pdfs").insert({
-        title: formTitle,
-        subject: formSubject,
-        semester: formYear, // Using 'semester' column for Year
-        doc_type: "PYQ",    // Hardcoded to PYQ
-        file_path: uploadData.path,
-        status: "pending",  // <--- CRITICAL: Will not show in list immediately
+      // 2. Insert Record with STATUS: PENDING via API route
+      const res = await fetch("/api/public/pdf/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: formTitle,
+          subject: formSubject,
+          semester: formYear, // Using 'semester' column for Year
+          doc_type: "PYQ",    // Hardcoded to PYQ
+          file_path: uploadData.path,
+          status: "pending",  // <--- CRITICAL: Will not show in list immediately
+        }),
       })
 
-      if (dbError) throw dbError
+      const responseData = await res.json()
+      if (!res.ok) throw new Error(responseData.error || "Failed to submit metadata")
+
 
       // 3. Reset & Close (No mutate needed as list won't change)
       setIsModalOpen(false)
@@ -297,13 +297,24 @@ export function PYQsPage() {
                 </p>
               </div>
 
-              <button 
-                onClick={() => downloadPDF(item.link, item.name)}
-                className="w-full mt-auto py-2.5 bg-muted/50 text-foreground hover:bg-primary hover:text-primary-foreground font-medium rounded-lg transition-all flex items-center justify-center gap-2 group-hover:shadow-md"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                Download PDF
-              </button>
+              <div className="mt-auto flex gap-2">
+                <a 
+                  href={item.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 py-2.5 bg-[#215ba6] hover:bg-[#1a4a88] text-white font-bold rounded-lg transition-all duration-300 flex items-center justify-center gap-2 shadow-sm hover:shadow-md hover:-translate-y-0.5"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                  View
+                </a>
+                <button 
+                  onClick={() => downloadPDF(item.link, item.name)}
+                  className="flex-[0.5] py-2.5 bg-muted/50 text-foreground hover:bg-primary hover:text-primary-foreground font-medium rounded-lg transition-all flex items-center justify-center group-hover:shadow-md"
+                  title="Download PDF"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                </button>
+              </div>
             </div>
           ))
         )}

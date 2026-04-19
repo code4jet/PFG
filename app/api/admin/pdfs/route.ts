@@ -1,29 +1,22 @@
-console.log(
-  "SERVICE KEY LOADED:",
-  !!process.env.SUPABASE_SERVICE_ROLE_KEY
-);
-
-
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
-export async function POST(req: Request) {
+export async function GET() {
   const cookieStore = await cookies();
   if (!cookieStore.get("admin_session")) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id } = await req.json();
-
-  const { error } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from("pdfs")
-    .update({ status: "approved" })
-    .eq("id", id);
+    .select("*")
+    .eq("status", "pending")
+    .order("created_at", { ascending: true });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ data: data || [] });
 }

@@ -4,7 +4,7 @@ import { getAnnouncementsSupabaseClient } from "./supabaseAnnouncements";
 
 // Announcements storage base URL, using the same env var as the Announcements client
 const BASE_URL =
-  `${process.env.NEXT_PUBLIC_APP_SUPABASE_URL}/storage/v1/object/public/announcements-images/`;
+  `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/announcements-images/`;
 
 export async function getCourseAnnouncements() {
   const supabase = getAnnouncementsSupabaseClient();
@@ -20,6 +20,6 @@ export async function getCourseAnnouncements() {
 
   return data.map((a: any) => ({
     ...a,
-    image_url: BASE_URL + a.image_path,
+    image_url: a.file_url || a.image_url || (a.image_path ? BASE_URL + a.image_path : null),
   }));
 }

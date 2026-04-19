@@ -20,6 +20,8 @@ import { OpportunitiesSection } from "@/components/sections/opportunities";
 import { LearningTracksSection } from "@/components/sections/tracks";
 import { JoinPFGSection } from "@/components/sections/join";
 import { ContributorSection } from "@/components/sections/contributor";
+import { AnnouncementsSection } from "@/components/sections/AnnouncementsSection";
+import AnnouncementsClient from "@/components/AnnouncementsClient";
 
 // ---------------- Video Background ----------------
 
@@ -115,6 +117,7 @@ function HomePage() {
   return (
     <>
       <Hero />
+      <AnnouncementsSection />
       <AboutPFGSection />
       <PeerLearningSection />
       <OpportunitiesSection />
