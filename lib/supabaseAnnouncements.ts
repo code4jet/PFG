@@ -1,4 +1,6 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
+
+let supabaseClientPromise: SupabaseClient | null = null;
 
 /**
  * Supabase client specifically for Announcements feature
@@ -6,6 +8,8 @@ import { createClient } from "@supabase/supabase-js";
  */
 export function getAnnouncementsSupabaseClient() {
   if (typeof window === "undefined") return null;
+
+  if (supabaseClientPromise) return supabaseClientPromise;
 
   // Uses unified Supabase project env vars
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -18,5 +22,6 @@ export function getAnnouncementsSupabaseClient() {
     return null;
   }
 
-  return createClient(supabaseUrl, supabaseAnonKey);
+  supabaseClientPromise = createClient(supabaseUrl, supabaseAnonKey);
+  return supabaseClientPromise;
 }

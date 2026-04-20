@@ -7,7 +7,7 @@ import { mutate } from "swr";
 import { getAnnouncementsSupabaseClient } from "@/lib/supabaseAnnouncements";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -96,10 +96,22 @@ function PdfFirstPagePreview({ url }: { url: string }) {
         const ctx = canvas.getContext("2d");
         if (!ctx) throw new Error("Canvas context unavailable");
 
-        canvas.width = scaledViewport.width;
-        canvas.height = scaledViewport.height;
+        // Fix blurry text on retina displays
+        const outputScale = window.devicePixelRatio || 1;
+        canvas.width = Math.floor(scaledViewport.width * outputScale);
+        canvas.height = Math.floor(scaledViewport.height * outputScale);
+        canvas.style.width = `${Math.floor(scaledViewport.width)}px`;
+        canvas.style.height = `${Math.floor(scaledViewport.height)}px`;
 
-        await page.render({ canvasContext: ctx, viewport: scaledViewport }).promise;
+        const transform = outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : null;
+
+        const renderContext = {
+          canvasContext: ctx,
+          transform: transform,
+          viewport: scaledViewport,
+        };
+        
+        await page.render(renderContext).promise;
 
         if (!cancelled) setLoading(false);
       } catch (err) {
@@ -116,7 +128,7 @@ function PdfFirstPagePreview({ url }: { url: string }) {
   }, [url]);
 
   return (
-    <div className="relative w-full bg-zinc-800/40 rounded-xl overflow-hidden" style={{ minHeight: "180px" }}>
+    <div className="relative w-full bg-zinc-950 overflow-hidden" style={{ minHeight: "180px" }}>
       {loading && !error && (
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="w-8 h-8 border-3 border-indigo-400 border-t-transparent rounded-full animate-spin" />
@@ -476,9 +488,9 @@ export default function AnnouncementsPage() {
                   </div>
 
                   {/* Preview Area — fills available height */}
-                  <div className="relative w-full flex-grow overflow-hidden bg-zinc-950/80 min-h-[50vh] flex items-center justify-center border-b border-white/5">
+                  <div className="relative w-full flex-grow overflow-hidden bg-zinc-950 flex items-center justify-center border-b border-white/5">
                     {hasPdf ? (
-                      <div className="w-full h-full min-h-[50vh] p-4 md:p-8 flex items-center justify-center bg-zinc-800/20">
+                      <div className="w-full relative flex items-center justify-center">
                         <PdfFirstPagePreview url={fileUrl} />
                       </div>
                     ) : hasImage ? (
@@ -540,6 +552,7 @@ export default function AnnouncementsPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Upload Announcement</DialogTitle>
+            <DialogDescription className="sr-only">Fill out this form to upload</DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleCreate} className="space-y-3 sm:space-y-4">
