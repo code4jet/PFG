@@ -1,8 +1,3 @@
-console.log(
-  "SERVICE KEY LOADED:",
-  !!process.env.SUPABASE_SERVICE_ROLE_KEY
-);
-
 
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { NextResponse } from "next/server";

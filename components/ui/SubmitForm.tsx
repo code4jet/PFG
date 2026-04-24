@@ -1,11 +1,10 @@
 "use client";
 import React, {
   useState,
-  ChangeEvent,
   FormEvent,
   useEffect,
+  useRef,
 } from "react";
-import { getSupabaseClient } from "@/lib/supabase";
 
 /* Icons (black) */
 const UploadIcon = () => (
@@ -25,7 +24,6 @@ const FileIcon = () => (
 export default function SubmitForm() {
   /* ✅ ALL HOOKS FIRST (NO RETURNS ABOVE THIS) */
   const [mounted, setMounted] = useState(false);
-  const [supabase, setSupabase] = useState<any>(null);
 
   const [title, setTitle] = useState("");
   const [subject, setSubject] = useState("");
@@ -33,73 +31,78 @@ export default function SubmitForm() {
   const [type, setType] = useState("PYQ");
   const [file, setFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   /* ✅ Client-only init */
   useEffect(() => {
     setMounted(true);
-    const client = getSupabaseClient();
-    setSupabase(client);
   }, []);
 
   /* ✅ SAFE CONDITIONAL RENDER (AFTER HOOKS) */
-  if (!mounted || !supabase) {
+  if (!mounted) {
     return null;
   }
 
-  const handleFile = (e: ChangeEvent<HTMLInputElement>) => {
-    const selected = e.target.files?.[0];
-    if (!selected) return;
-
-    if (selected.type !== "application/pdf") {
-      alert("Only PDF files are allowed.");
-      return;
-    }
-
-    if (selected.size > 10 * 1024 * 1024) {
-      alert("File size must be under 10MB.");
-      return;
-    }
-
-    setFile(selected);
-  };
-
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!file) return alert("Please upload a PDF.");
+
+    if (!file) return alert("Please select a file to upload.");
 
     try {
       setIsSubmitting(true);
 
-      const fileName = `${Date.now()}-${file.name}`;
-      const { data, error: storageError } = await supabase.storage
-        .from("pdfs")
-        .upload(fileName, file);
+      // 1. Upload to Cloudinary via our API route
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("folder", "pfg/pdfs");
 
-      if (storageError) throw storageError;
-
-      const { error: dbError } = await supabase.from("pdfs").insert({
-        title,
-        subject,
-        semester: year,
-        doc_type: type,
-        file_path: data.path,
-        status: "pending",
+      const uploadRes = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
       });
 
-      if (dbError) throw dbError;
+      if (!uploadRes.ok) {
+        const errorData = await uploadRes.json();
+        throw new Error(errorData.error || "File upload failed");
+      }
 
-      alert("Submitted! Awaiting admin approval.");
+      const uploadData = await uploadRes.json();
+      const cloudinaryUrl = uploadData.url;
+
+      // 2. Save metadata to Supabase via our admin API route (bypasses RLS)
+      const submitRes = await fetch("/api/public/pdf/submit", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title,
+          subject,
+          semester: year,
+          doc_type: type,
+          file_path: cloudinaryUrl,
+        }),
+      });
+
+      if (!submitRes.ok) {
+        const errorData = await submitRes.json();
+        throw new Error(errorData.error || "Database saving failed");
+      }
+
+      alert("✅ Submitted! Awaiting admin approval.");
 
       setTitle("");
       setSubject("");
       setYear("");
       setType("PYQ");
       setFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     } catch (err: any) {
-  console.error("FULL ERROR:", err);
-  alert(err?.message || "Upload failed");
-}
- {
+      console.error("SUBMISSION ERROR:", err);
+      alert(err?.message || "Submission failed");
+    } finally {
       setIsSubmitting(false);
     }
   };
@@ -159,30 +162,29 @@ export default function SubmitForm() {
             ))}
           </div>
 
-          <div className="relative border-2 border-dashed rounded-lg p-6 text-center">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-black px-1">Upload PDF / Image</label>
             <input
               type="file"
-              accept="application/pdf"
-              onChange={handleFile}
-              className="absolute inset-0 opacity-0 cursor-pointer"
+              accept=".pdf,image/*"
+              className="w-full px-4 py-2 border rounded-lg text-black focus:ring-2 focus:ring-black/5"
+              onChange={(e) => {
+                if (e.target.files && e.target.files[0]) {
+                  setFile(e.target.files[0]);
+                }
+              }}
+              required
+              ref={fileInputRef}
             />
-            {file ? (
-              <div className="flex justify-center items-center">
-                <FileIcon />
-                {file.name}
-              </div>
-            ) : (
-              <>
-                <UploadIcon />
-                <p className="text-sm">Click to upload PDF (max 10MB)</p>
-              </>
-            )}
+            <p className="text-[11px] text-gray-500 px-1">
+              Max file size: 10MB
+            </p>
           </div>
 
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full py-3 bg-black text-white rounded-lg"
+            className="w-full py-3 bg-black text-white rounded-lg disabled:opacity-50"
           >
             {isSubmitting ? "Uploading..." : "Submit Material"}
           </button>

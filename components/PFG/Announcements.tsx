@@ -345,38 +345,30 @@ export default function AnnouncementsPage() {
     let file_url: string | null = null;
 
     if (file) {
-      const allowedTypes = [
-        "application/pdf",
-        "image/jpeg",
-        "image/jpg",
-        "image/png",
-        "image/webp",
-        "image/gif",
-      ];
+      // WHY: Instead of uploading directly from the browser to Supabase Storage,
+      // we send the file to our own API route which securely uploads to Cloudinary.
+      // This keeps the API secret off the browser and uses 25 GB free storage.
+      const uploadForm = new FormData();
+      uploadForm.append("file", file);
+      uploadForm.append("folder", "pfg/announcements");
 
-      if (!allowedTypes.includes(file.type)) {
-        alert("Only PDF and image files are allowed");
+      const uploadRes = await fetch("/api/upload", {
+        method: "POST",
+        body: uploadForm,
+      });
+
+      const uploadResult = await uploadRes.json();
+
+      if (!uploadRes.ok) {
+        console.error("Upload Error:", uploadResult.error);
+        alert(`File upload failed: ${uploadResult.error}`);
         setIsSubmitting(false);
         return;
       }
 
-      const fileName = `${Date.now()}-${file.name}`;
-      const { error: uploadError } = await supabase.storage
-        .from("announcements-images")
-        .upload(fileName, file);
-
-      if (uploadError) {
-        console.error("Upload Error:", uploadError);
-        alert(`File upload failed: ${uploadError.message}`);
-        setIsSubmitting(false);
-        return;
-      }
-
-      const { data } = supabase.storage
-        .from("announcements-images")
-        .getPublicUrl(fileName);
-
-      file_url = data.publicUrl;
+      // uploadResult.url is a full Cloudinary CDN URL e.g.:
+      // https://res.cloudinary.com/dua1zngqd/image/upload/v.../pfg/announcements/...
+      file_url = uploadResult.url;
     }
 
     const { error } = await supabase.from("announcements").insert([

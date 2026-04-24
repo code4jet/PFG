@@ -1,8 +1,7 @@
 "use client"
 
 import useSWR from "swr"
-import { useMemo, useState, ChangeEvent, FormEvent } from "react"
-import { getSupabaseClient } from "@/lib/supabase"
+import { useMemo, useState, FormEvent } from "react"
 
 /* -------------------------------------------------------------------------- */
 /* TYPES                                                                      */
@@ -52,15 +51,14 @@ const fetcher = async (): Promise<PYQ[]> => {
     if (!res.ok) throw new Error("Failed to fetch")
     const { data } = await res.json()
 
-    const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-
+    // WHY: file_path now stores the full Cloudinary URL directly.
     return (data || []).map((d: any) => ({
       id: d.id,
       name: d.title,
       subject: d.subject,
       year: d.semester, // DB uses 'semester', UI uses 'year'
       type: d.doc_type,
-      link: `${baseUrl}/storage/v1/object/public/pdfs/${d.file_path}`,
+      link: d.file_path,
       created_at: d.created_at
     }))
   } catch (error) {
@@ -118,7 +116,7 @@ export function PYQsPage() {
     setSortBy("newest")
   }
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0]
     if (selected) {
         if (selected.type !== "application/pdf") return alert("Only PDF files are allowed.")
@@ -129,23 +127,30 @@ export function PYQsPage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    if (!formFile) return alert("Please upload a PDF.")
 
-    const supabase = getSupabaseClient()
-    if (!supabase) return
+    if (!formFile) return alert("Please select a PDF file.")
 
     try {
       setIsSubmitting(true)
-      
-      // 1. Upload File
-      const fileName = `${Date.now()}-${formFile.name}`
-      const { data: uploadData, error: storageError } = await supabase.storage
-        .from("pdfs")
-        .upload(fileName, formFile)
 
-      if (storageError) throw storageError
+      // 1. Upload to Cloudinary
+      const uploadForm = new FormData()
+      uploadForm.append("file", formFile)
+      uploadForm.append("folder", "pfg/pdfs")
 
-      // 2. Insert Record with STATUS: PENDING via API route
+      const uploadRes = await fetch("/api/upload", {
+        method: "POST",
+        body: uploadForm,
+      })
+      const uploadResult = await uploadRes.json()
+
+      if (!uploadRes.ok) {
+        throw new Error(uploadResult.error || "Failed to upload file")
+      }
+
+      const fileUrl = uploadResult.url
+
+      // 2. Submit to Database
       const res = await fetch("/api/public/pdf/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -154,28 +159,26 @@ export function PYQsPage() {
           subject: formSubject,
           semester: formYear, // Using 'semester' column for Year
           doc_type: "PYQ",    // Hardcoded to PYQ
-          file_path: uploadData.path,
-          status: "pending",  // <--- CRITICAL: Will not show in list immediately
+          file_path: fileUrl,
+          status: "pending",
         }),
       })
 
       const responseData = await res.json()
-      if (!res.ok) throw new Error(responseData.error || "Failed to submit metadata")
+      if (!res.ok) throw new Error(responseData.error || "Failed to submit")
 
-
-      // 3. Reset & Close (No mutate needed as list won't change)
+      // Reset & Close
       setIsModalOpen(false)
       setFormTitle("")
       setFormSubject("")
       setFormYear("")
       setFormFile(null)
-      
-      // 4. Feedback
-      alert("Submission successful! Your PYQ is pending admin approval.")
+
+      alert("✅ Submission successful! Your PYQ is pending admin approval.")
 
     } catch (err: any) {
       console.error(err)
-      alert(err.message || "Upload failed")
+      alert(err.message || "Submission failed")
     } finally {
       setIsSubmitting(false)
     }
