@@ -53,8 +53,8 @@ export async function POST(req: Request) {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
           folder: folderName,
-          resource_type: isPdf ? "image" : "auto", // PDFs must be 'image' for Cloudinary to generate previews, but 'image' is standard for PDFs in Cloudinary
-          format: isPdf ? "pdf" : undefined, // Force .pdf extension for proper browser rendering
+          resource_type: isPdf ? "raw" : "auto",
+          type: "upload",
         },
         (error, result) => {
           if (error) reject(error);
@@ -64,11 +64,7 @@ export async function POST(req: Request) {
       uploadStream.end(buffer);
     });
 
-    // Ensure URL has .pdf extension if it's a PDF
     let finalUrl = result.secure_url;
-    if (isPdf && !finalUrl.endsWith(".pdf")) {
-      finalUrl += ".pdf";
-    }
 
     // Return the CDN URL + public_id (needed for deleting later)
     return NextResponse.json({

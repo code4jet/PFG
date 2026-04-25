@@ -23,8 +23,23 @@ type Assignment = {
 // 1. Download Helper
 async function downloadPDF(url: string, filename: string) {
   try {
-    const res = await fetch(url)
-    if (!res.ok) throw new Error("Download failed")
+    if (!url.includes("cloudinary.com") && !url.includes("res.cloudinary.com")) {
+      window.open(url, "_blank")
+      return
+    }
+    // Use backend proxy to bypass CORS issues with Cloudinary
+    const proxyUrl = `/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`
+    const res = await fetch(proxyUrl)
+    if (!res.ok) {
+      let message = "Download failed"
+      try {
+        const json = await res.json()
+        message = json?.error ? `Download failed: ${json.error}` : message
+      } catch {
+        // ignore parse errors
+      }
+      throw new Error(message)
+    }
 
     const blob = await res.blob()
     const blobUrl = window.URL.createObjectURL(blob)
@@ -37,9 +52,9 @@ async function downloadPDF(url: string, filename: string) {
 
     document.body.removeChild(a)
     window.URL.revokeObjectURL(blobUrl)
-  } catch (err) {
+  } catch (err: any) {
     console.error(err)
-    alert("Failed to download PDF")
+    alert(err?.message || "Failed to download PDF")
   }
 }
 
@@ -303,7 +318,7 @@ export function AssignmentsPage() {
 
               <div className="mt-auto flex gap-2">
                 <a 
-                  href={item.link}
+                  href={`/api/download?url=${encodeURIComponent(item.link)}&inline=true&filename=${encodeURIComponent(item.name)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex-1 py-2.5 bg-[#215ba6] hover:bg-[#1a4a88] text-white font-bold rounded-lg transition-all duration-300 flex items-center justify-center gap-2 shadow-sm hover:shadow-md hover:-translate-y-0.5"

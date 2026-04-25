@@ -12,6 +12,7 @@ import {
   Check,
   X,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { getSupabaseClient } from "@/lib/supabase";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -20,6 +21,7 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 type AnnouncementAdmin = {
   id: string;
   title: string;
+  file_url?: string;
   description: string;
   created_at: string;
 };
@@ -213,7 +215,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                 </p>
 
                 <a
-                  href={`${SUPABASE_URL}/storage/v1/object/public/pdfs/${d.file_path}`}
+                  href={d.file_path}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-block mt-1 text-sm text-indigo-600 hover:text-indigo-800 underline font-medium transition-colors"
@@ -275,6 +277,16 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                 <p className="font-semibold text-lg text-black">{a.title}</p>
                 <p className="text-sm text-gray-600">{a.description}</p>
                 <p className="text-xs text-gray-500">{new Date(a.created_at).toLocaleString()}</p>
+                {a.file_url && (
+                  <a
+                    href={a.file_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block mt-1 text-sm text-indigo-600 hover:text-indigo-800 underline font-medium transition-colors"
+                  >
+                    View Attachment
+                  </a>
+                )}
               </div>
               <div className="flex gap-2 w-full sm:w-auto mt-2 sm:mt-0">
                 <button
@@ -369,110 +381,13 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
   );
 }
 
-/* ---------------- LOGIN PAGE ---------------- */
-
 export default function AdminPage() {
-  const [input, setInput] = useState("");
-  const [auth, setAuth] = useState(false);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [checkingAuth, setCheckingAuth] = useState(true);
-
-  React.useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const res = await fetch("/api/admin/check");
-        if (res.ok) {
-          setAuth(true);
-        }
-      } catch (err) {
-        // Not authenticated
-      } finally {
-        setCheckingAuth(false);
-      }
-    };
-    checkAuth();
-  }, []);
-
-  const login = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-
-    try {
-      const res = await fetch("/api/admin/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: input }),
-      });
-
-      if (res.ok) {
-        setAuth(true);
-      } else {
-        const body = await res.json().catch(() => ({}));
-        setError(body.error || "Incorrect password");
-      }
-    } catch (err) {
-      setError("Login failed. Check connection.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const router = useRouter();
 
   const handleLogout = async () => {
-    await fetch("/api/admin/logout", { method: "POST" });
-    setAuth(false);
+    await fetch("/api/admin/auth", { method: "DELETE" });
+    router.push("/admin/login");
   };
 
-  if (checkingAuth) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="w-8 h-8 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-
-  if (auth) return <AdminPanel onLogout={handleLogout} />;
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-      <form
-        onSubmit={login}
-        className="bg-white p-6 md:p-8 rounded-2xl shadow-lg w-full max-w-md transition-all"
-      >
-        <div className="text-center mb-6 text-black">
-          <div className="w-14 h-14 bg-indigo-600 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-md">
-            <Lock className="text-white" />
-          </div>
-          <h1 className="text-2xl font-bold text-black">Admin Login</h1>
-        </div>
-
-        <input
-          type="password"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Admin password"
-          className="w-full px-4 py-3 border border-gray-300 rounded-xl text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all mb-3"
-        />
-
-        {error && (
-          <p className="text-red-500 text-sm mb-3 text-center font-medium animate-pulse">
-            {error}
-          </p>
-        )}
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl shadow-md transition-all active:scale-95 disabled:opacity-70 disabled:active:scale-100 flex items-center justify-center"
-        >
-          {loading ? (
-            <span className="flex items-center gap-2">Checking...</span>
-          ) : (
-            "Access Dashboard"
-          )}
-        </button>
-      </form>
-    </div>
-  );
+  return <AdminPanel onLogout={handleLogout} />;
 }
